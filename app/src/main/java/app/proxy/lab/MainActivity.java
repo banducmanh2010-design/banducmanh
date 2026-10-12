@@ -210,7 +210,15 @@ public class MainActivity extends Activity {
     }
 
     private InetSocketAddress parseProxy(String line) {
-        if (line == null || !line.matches("\\d{1,3}(\\.\\d{1,3}){3}:\\d{1,5}")) {
+        if (line == null) return null;
+        line = line.trim();
+        // ProxyScrape's text list uses "http://IP:port".
+        if (line.startsWith("http://")) {
+            line = line.substring("http://".length());
+        } else if (line.contains("://")) {
+            return null;
+        }
+        if (!line.matches("\\d{1,3}(\\.\\d{1,3}){3}:\\d{1,5}")) {
             return null;
         }
         String[] parts = line.split(":");

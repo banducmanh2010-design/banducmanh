@@ -35,6 +35,34 @@ public class MainActivity extends Activity {
     private TextView checkedAtText;
     private Button checkButton;
 
+    // Learning sandbox: reserved documentation IPs, never opened as real connections.
+    private static final String[] LAB_NODES = {
+            "192.0.2.10", "198.51.100.20", "203.0.113.30"
+    };
+    private static final int[] LAB_LATENCY_MS = {38, 81, 124};
+    private TextView labStatusText;
+    private TextView labNodeText;
+    private TextView labCountdownText;
+    private int labNodeIndex = 0;
+    private int labSeconds = 60;
+    private boolean labRunning = false;
+
+    private final Runnable labTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (!labRunning) return;
+            labSeconds--;
+            if (labSeconds <= 0) {
+                labNodeIndex = (labNodeIndex + 1) % LAB_NODES.length;
+                labSeconds = 60;
+                updateLabUi("Đã chuyển mục theo thuật toán vòng tròn.");
+            } else {
+                labCountdownText.setText("Chuyển mục tiếp theo sau: " + labSeconds + " giây");
+            }
+            handler.postDelayed(this, 1000L);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -84,6 +112,37 @@ public class MainActivity extends Activity {
         addTop(root, checkButton, 20);
         checkButton.setOnClickListener(v -> checkConnection());
 
+        LinearLayout labCard = new LinearLayout(this);
+        labCard.setOrientation(LinearLayout.VERTICAL);
+        labCard.setPadding(dp(18), dp(18), dp(18), dp(18));
+        GradientDrawable labBg = new GradientDrawable();
+        labBg.setColor(Color.rgb(19, 29, 48));
+        labBg.setCornerRadius(dp(18));
+        labCard.setBackground(labBg);
+        addTop(root, labCard, 26);
+
+        labCard.addView(text("PHÒNG THỰC HÀNH LUÂN PHIÊN", 17,
+                Color.rgb(147, 197, 253), true));
+        addTop(labCard, text("MÔ PHỎNG THUẬT TOÁN · KHÔNG TẠO KẾT NỐI THẬT", 11,
+                Color.rgb(174, 188, 207), true), 8);
+        labStatusText = text("Trạng thái: đã dừng", 14, Color.WHITE, true);
+        addTop(labCard, labStatusText, 16);
+        labNodeText = text("Nút minh họa: " + LAB_NODES[labNodeIndex], 19,
+                Color.rgb(74, 222, 187), true);
+        addTop(labCard, labNodeText, 8);
+        labCountdownText = text("Bộ đếm: chưa chạy", 13,
+                Color.rgb(174, 188, 207), false);
+        addTop(labCard, labCountdownText, 8);
+        addTop(labCard, text("Độ trễ giả lập: " + LAB_LATENCY_MS[labNodeIndex] + " ms", 13,
+                Color.rgb(220, 230, 242), false), 8);
+
+        Button labStartButton = button("Chạy mô phỏng 60 giây", Color.rgb(42, 90, 145));
+        Button labStopButton = button("Dừng mô phỏng", Color.rgb(63, 74, 98));
+        addTop(labCard, labStartButton, 16);
+        addTop(labCard, labStopButton, 8);
+        labStartButton.setOnClickListener(v -> startLab());
+        labStopButton.setOnClickListener(v -> stopLab());
+
         TextView note = text(
                 "CÁCH HOẠT ĐỘNG\nỨng dụng gửi một yêu cầu HTTPS đến dịch vụ kiểm tra IP, " +
                 "rồi hiển thị IP mà dịch vụ nhìn thấy và thời gian phản hồi của yêu cầu đó. " +
@@ -99,6 +158,30 @@ public class MainActivity extends Activity {
         addTop(root, footer, 24);
 
         setContentView(scroll);
+    }
+
+    private void startLab() {
+        labRunning = true;
+        labSeconds = 60;
+        handler.removeCallbacks(labTicker);
+        updateLabUi("Đang chạy mô phỏng.");
+        handler.postDelayed(labTicker, 1000L);
+    }
+
+    private void stopLab() {
+        labRunning = false;
+        handler.removeCallbacks(labTicker);
+        labStatusText.setText("Trạng thái: đã dừng");
+        labCountdownText.setText("Bộ đếm: đã dừng");
+    }
+
+    private void updateLabUi(String state) {
+        labStatusText.setText("Trạng thái: " + state);
+        labNodeText.setText("Nút minh họa: " + LAB_NODES[labNodeIndex]);
+        labCountdownText.setText("Chuyển mục tiếp theo sau: " + labSeconds + " giây");
+        // The latency values are illustrative and deliberately do not measure any endpoint.
+        labStatusText.setText("Trạng thái: " + state + " · Độ trễ minh họa " +
+                LAB_LATENCY_MS[labNodeIndex] + " ms");
     }
 
     private void checkConnection() {
@@ -211,6 +294,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         checking.set(false);
+        labRunning = false;
+        handler.removeCallbacks(labTicker);
         networkExecutor.shutdownNow();
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
